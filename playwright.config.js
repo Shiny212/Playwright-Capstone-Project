@@ -1,44 +1,44 @@
-
 // @ts-check
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
 
- testDir:'./tests',
+  testDir: './tests',
 
- reporter:[
-   ['html'],
-   ['allure-playwright',{resultsDir:'allure-results'}]
- ],
+  timeout: 90000,
 
- fullyParallel:true,
+  fullyParallel: true,
 
- use:{
+  forbidOnly: !!process.env.CI,
 
-   trace:'on-first-retry',
+  retries: 1,
 
-   screenshot:'only-on-failure',
+  workers: process.env.CI ? 1 : undefined,
 
-   video:'retain-on-failure'
- },
+  reporter: [
+    ["html", { outputFolder: "reports/html-report", open: "never" }],
+    ["allure-playwright", { resultsDir: "allure-results" }]
+  ],
 
- projects:[
+  use: {
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure'
+  },
 
- {
-   name:'chromium',
-   use:{...devices['Desktop Chrome']}
- },
-
- {
-   name:'firefox',
-   use:{...devices['Desktop Firefox']}
- },
-
- {
-   name:'webkit',
-   use:{...devices['Desktop Safari']}
- }
-
- ]
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] }
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] }
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] }
+    }
+  ]
 
 });
