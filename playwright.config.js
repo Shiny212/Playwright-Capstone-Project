@@ -1,55 +1,44 @@
+
 // @ts-check
-const { defineConfig, devices } = require('@playwright/test');
+import { defineConfig, devices } from '@playwright/test';
 
-module.exports = defineConfig({
+export default defineConfig({
 
-    testDir: './tests',
+ testDir:'./tests',
 
-    timeout: 60000,
+ reporter:[
+   ['html'],
+   ['allure-playwright',{resultsDir:'allure-results'}]
+ ],
 
-    fullyParallel: false,
+ fullyParallel:true,
 
-    workers: 1,
+ use:{
 
-    retries: 0,
+   trace:'on-first-retry',
 
-    reporter: [
-        ['html'],
-        ['allure-playwright' , { resultsDir: 'allure-results' }]
-    ],
+   screenshot:'only-on-failure',
 
-    use: {
-        baseURL: 'https://opensource-demo.orangehrmlive.com',
-        trace: 'on-first-retry',
-        screenshot: 'only-on-failure',
-        video: 'retain-on-failure'
-    },
+   video:'retain-on-failure'
+ },
 
-    projects: [
-        {
-            name: 'setup',
-            testMatch: /setup\/auth\.setup\.js/
-        },
+ projects:[
 
-        {
-            name: 'chromium',
-            testIgnore: /setup\/auth\.setup\.js/,
-            use: {
-                ...devices['Desktop Chrome'],
-                storageState: 'storageState.json'
-            },
-            dependencies: ['setup']
-        },
+ {
+   name:'chromium',
+   use:{...devices['Desktop Chrome']}
+ },
 
-        {
-            name: 'firefox',
-            testIgnore: /setup\/auth\.setup\.js/,
-            use: {
-                ...devices['Desktop Firefox'],
-                storageState: 'storageState.json'
-            },
-            dependencies: ['setup']
-        }
-    ]
+ {
+   name:'firefox',
+   use:{...devices['Desktop Firefox']}
+ },
+
+ {
+   name:'webkit',
+   use:{...devices['Desktop Safari']}
+ }
+
+ ]
 
 });
