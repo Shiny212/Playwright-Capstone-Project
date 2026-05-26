@@ -2,34 +2,54 @@
 const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
-  testDir: './tests',
 
-  fullyParallel: true,
+    testDir: './tests',
 
-  retries: process.env.CI ? 2 : 0,
+    timeout: 60000,
 
-  workers: process.env.CI ? 2 : undefined,
+    fullyParallel: false,
 
-  reporter: [
-    ['html'],
-    ['allure-playwright']
-  ],
+    workers: 1,
 
-  use: {
-    baseURL: 'http://demowebshop.tricentis.com/',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure'
-  },
+    retries: 0,
 
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+    reporter: [
+        ['html'],
+        ['allure-playwright' , { resultsDir: 'allure-results' }]
+    ],
+
+    use: {
+        baseURL: 'https://opensource-demo.orangehrmlive.com',
+        trace: 'on-first-retry',
+        screenshot: 'only-on-failure',
+        video: 'retain-on-failure'
     },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    }
-  ],
+
+    projects: [
+        {
+            name: 'setup',
+            testMatch: /setup\/auth\.setup\.js/
+        },
+
+        {
+            name: 'chromium',
+            testIgnore: /setup\/auth\.setup\.js/,
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: 'storageState.json'
+            },
+            dependencies: ['setup']
+        },
+
+        {
+            name: 'firefox',
+            testIgnore: /setup\/auth\.setup\.js/,
+            use: {
+                ...devices['Desktop Firefox'],
+                storageState: 'storageState.json'
+            },
+            dependencies: ['setup']
+        }
+    ]
+
 });
