@@ -15,9 +15,9 @@
 
     "report": "playwright show-report",
 
-    "allure:generate": "allure generate allure-results --clean -o reports/allure-report",
+    "allure:generate": "allure generate allure-results --clean -o allure-report",
 
-    "allure:open": "allure open reports/allure-report",
+    "allure:open": "allure open allure-report",
 
     "codegen": "playwright codegen https://opensource-demo.orangehrmlive.com/web/index.php/auth/login"
 

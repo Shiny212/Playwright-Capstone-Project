@@ -4,7 +4,12 @@ on:
 
   push:
     branches:
+      - "**"
+
+  pull_request:
+    branches:
       - main
+      - master
 
   workflow_dispatch:
 
@@ -19,9 +24,18 @@ jobs:
 
   test:
 
-    timeout-minutes: 120
+    timeout-minutes: 60
 
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        shard_index: [1, 2, 3]
+
+    env:
+      CI: true
 
 
     steps:
@@ -48,31 +62,77 @@ jobs:
 
       - name: Run Playwright Tests
 
-        run: npx playwright test --workers=1
+        run: npm run test:ci -- --shard=${{ matrix.shard_index }}/3
 
         continue-on-error: true
 
 
-      - name: Generate Allure Report
-
-        run: npx allure generate allure-results --clean -o reports/allure-report
-
-        continue-on-error: true
-
-
-      - name: Upload Playwright HTML Report
+      - name: Upload Allure Raw Results (Shard)
 
         if: always()
 
         uses: actions/upload-artifact@v4
 
         with:
-          name: playwright-html-report
-          path: playwright-report
+          name: allure-results-shard-${{ matrix.shard_index }}
+          path: allure-results
           if-no-files-found: warn
+          retention-days: 14
 
 
-      - name: Upload Allure Report
+
+  report:
+
+    if: ${{ always() }}
+
+    needs: [test]
+
+    timeout-minutes: 30
+
+    runs-on: ubuntu-latest
+
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+
+        with:
+          node-version: lts/*
+          cache: npm
+
+
+      - name: Install Dependencies
+        run: npm ci
+
+
+      - name: Download Allure Raw Results
+
+        uses: actions/download-artifact@v4
+
+        with:
+          pattern: allure-results-shard-*
+          merge-multiple: true
+          path: allure-results
+
+
+      - name: Ensure Allure Results Directory
+
+        run: mkdir -p allure-results
+
+
+      - name: Generate Allure Report
+
+        run: npm run allure:generate
+
+        continue-on-error: true
+
+
+      - name: Upload Allure HTML Report
 
         if: always()
 
@@ -80,35 +140,21 @@ jobs:
 
         with:
           name: allure-report
-          path: reports/allure-report
+          path: allure-report
           if-no-files-found: warn
+          retention-days: 14
 
 
-      - name: Commit Updated Reports
+      - name: Deploy to GitHub Pages
 
-        if: always()
-
-        run: |
-
-          git config --global user.email "actions@github.com"
-
-          git config --global user.name "github-actions"
-
-          git add reports/
-
-          git commit -m "Update Allure reports" || echo "No changes"
-
-          git push
-
-
-      - name: Deploy Reports to GitHub Pages
-
-        if: always()
+        if: always() && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')
 
         uses: peaceiris/actions-gh-pages@v3
 
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
-          publish_dir: reports/allure-report
+          publish_dir: allure-report
           force_orphan: true
+
+        continue-on-error: true
