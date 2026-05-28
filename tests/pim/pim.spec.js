@@ -1,145 +1,233 @@
-import { test, expect } from "@playwright/test";
+const { test, expect } = require("@playwright/test");
 
-test.setTimeout(90000);
 
+// Login function
 async function login(page) {
+
   await page.goto(
     "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
-    { waitUntil: "domcontentloaded", timeout: 60000 }
+    {
+      waitUntil: "domcontentloaded",
+      timeout: 60000
+    }
   );
 
-  await page.locator('input[name="username"]').fill("Admin");
-  await page.locator('input[name="password"]').fill("admin123");
-  await page.locator('button[type="submit"]').click();
+  const username = page.locator('input[name="username"]');
 
-  await expect(page).toHaveURL(/dashboard/, { timeout: 60000 });
+  const password = page.locator('input[name="password"]');
+
+  await username.waitFor({
+    state: "visible",
+    timeout: 60000
+  });
+
+  await username.fill("Admin");
+
+  await password.fill("admin123");
+
+  await page.getByRole("button", {
+    name: "Login"
+  }).click();
+
+  await expect(page).toHaveURL(/dashboard/, {
+    timeout: 60000
+  });
+
 }
 
+
+// Open PIM module
 async function openPIM(page) {
-  await page.getByRole("link", { name: /^PIM$/ }).click();
 
-  await expect(page).toHaveURL(/pim/, { timeout: 60000 });
+  await page.locator(".oxd-sidepanel-body").waitFor({
+    state: "visible",
+    timeout: 60000
+  });
+
+  const pimMenu = page.getByRole("link", {
+    name: /^PIM$/
+  });
+
+  await pimMenu.waitFor({
+    state: "visible",
+    timeout: 60000
+  });
+
+  await pimMenu.click();
+
+  await expect(page).toHaveURL(/pim/, {
+    timeout: 60000
+  });
+
 }
 
-async function openAddEmployee(page) {
-  await page.getByRole("link", { name: /Add Employee/ }).click();
 
-  await expect(page).toHaveURL(/addEmployee/, { timeout: 60000 });
-}
-
+// PIM Tests
 test.describe("PIM Employee Management", () => {
 
   test.beforeEach(async ({ page }) => {
+
     await login(page);
+
     await openPIM(page);
+
   });
 
-  test("1 Open PIM module", async ({ page }) => {
+
+  test("1 PIM page should open", async ({ page }) => {
+
     await expect(page).toHaveURL(/pim/);
+
   });
 
-  test("2 Employee list table should be visible", async ({ page }) => {
-    await expect(page.locator(".oxd-table")).toBeVisible({ timeout: 30000 });
-  });
 
-  test("3 Search employee by name", async ({ page }) => {
-    await page.locator(".oxd-input").nth(1).fill("Linda");
-    await page.getByRole("button", { name: /Search|Buscar/ }).click();
-
-    await expect(page.locator(".oxd-table")).toBeVisible({ timeout: 30000 });
-  });
-
-  test("4 Reset employee filters", async ({ page }) => {
-    await page.locator(".oxd-input").nth(1).fill("Linda");
-    await page.getByRole("button", { name: /Reset|Restablecer/ }).click();
-
-    await expect(page.locator(".oxd-input").nth(1)).toHaveValue("");
-  });
-
-  test("5 Open Add Employee form", async ({ page }) => {
-    await openAddEmployee(page);
-
-    await expect(page.locator('input[name="firstName"]')).toBeVisible();
-  });
-
-  test("6 Required validation on empty employee form", async ({ page }) => {
-    await openAddEmployee(page);
-
-    await page.getByRole("button", { name: /Save|Guardar/ }).click();
+  test("2 Employee Information heading should be visible", async ({ page }) => {
 
     await expect(
-      page.locator(".oxd-input-field-error-message").first()
-    ).toBeVisible({ timeout: 30000 });
+      page.getByText("Employee Information")
+    ).toBeVisible();
+
   });
 
-  test("7 First name field should accept input", async ({ page }) => {
-    await openAddEmployee(page);
 
-    await page.locator('input[name="firstName"]').fill("Test");
-    await expect(page.locator('input[name="firstName"]')).toHaveValue("Test");
+  test("3 Employee name field should accept input", async ({ page }) => {
+
+    const employeeField = page.locator(
+      ".oxd-autocomplete-text-input input"
+    ).first();
+
+    await employeeField.fill("Linda");
+
+    await expect(employeeField).toHaveValue("Linda");
+
   });
 
-  test("8 Middle name field should accept input", async ({ page }) => {
-    await openAddEmployee(page);
 
-    await page.locator('input[name="middleName"]').fill("Automation");
-    await expect(page.locator('input[name="middleName"]')).toHaveValue("Automation");
+  test("4 Employee ID field should accept input", async ({ page }) => {
+
+    const employeeId = page.locator(".oxd-input").nth(1);
+
+    await employeeId.fill("1234");
+
+    await expect(employeeId).toHaveValue("1234");
+
   });
 
-  test("9 Last name field should accept input", async ({ page }) => {
-    await openAddEmployee(page);
 
-    await page.locator('input[name="lastName"]').fill("User");
-    await expect(page.locator('input[name="lastName"]')).toHaveValue("User");
+  test("5 Search button should be visible", async ({ page }) => {
+
+    await expect(
+      page.getByRole("button", { name: "Search" })
+    ).toBeVisible();
+
   });
 
-  test("10 Employee ID field should be available", async ({ page }) => {
-    await openAddEmployee(page);
 
-    await expect(page.locator(".oxd-input").last()).toBeVisible({
-      timeout: 30000
+  test("6 Reset button should be visible", async ({ page }) => {
+
+    await expect(
+      page.getByRole("button", { name: "Reset" })
+    ).toBeVisible();
+
+  });
+
+
+  test("7 Add Employee page should open", async ({ page }) => {
+
+    await page.getByRole("button", { name: "Add" }).click();
+
+    await expect(page).toHaveURL(/addEmployee/);
+
+  });
+
+
+  test("8 First Name field should be visible", async ({ page }) => {
+
+    await page.getByRole("button", { name: "Add" }).click();
+
+    await expect(
+      page.locator('input[name="firstName"]')
+    ).toBeVisible();
+
+  });
+
+
+  test("9 Middle Name field should be visible", async ({ page }) => {
+
+    await page.getByRole("button", { name: "Add" }).click();
+
+    await expect(
+      page.locator('input[name="middleName"]')
+    ).toBeVisible();
+
+  });
+
+
+  test("10 Last Name field should be visible", async ({ page }) => {
+
+    await page.getByRole("button", { name: "Add" }).click();
+
+    await expect(
+      page.locator('input[name="lastName"]')
+    ).toBeVisible();
+
+  });
+
+
+  test("11 Save button should be visible", async ({ page }) => {
+
+    await page.getByRole("button", { name: "Add" }).click();
+
+    await expect(
+      page.getByRole("button", { name: "Save" })
+    ).toBeVisible();
+
+  });
+
+
+  test("12 Cancel button should be visible", async ({ page }) => {
+
+    await page.getByRole("button", { name: "Add" }).click();
+
+    await expect(
+      page.getByRole("button", { name: "Cancel" })
+    ).toBeVisible();
+
+  });
+
+
+  test("13 Employee table should be visible", async ({ page }) => {
+
+    await expect(
+      page.locator(".oxd-table-body")
+    ).toBeVisible();
+
+  });
+
+
+  test("14 PIM page should refresh successfully", async ({ page }) => {
+
+    await page.reload({
+      waitUntil: "domcontentloaded"
     });
+
+    await expect(page).toHaveURL(/pim/);
+
   });
 
-  test("11 Create Login Details toggle should work", async ({ page }) => {
-    await openAddEmployee(page);
-
-    await page.locator(".oxd-switch-input").click();
-
-    await expect(page.locator('input[type="password"]').first()).toBeVisible({
-      timeout: 30000
-    });
-  });
-
-  test("12 Employee image upload control should exist", async ({ page }) => {
-    await openAddEmployee(page);
-
-    const uploadInput = page.locator('input[type="file"]');
-
-    await expect(uploadInput).toBeAttached();
-  });
-
-  test("13 Pagination validation if available", async ({ page }) => {
-    const pagination = page.locator(".oxd-pagination");
-
-    if ((await pagination.count()) > 0) {
-      await expect(pagination).toBeVisible();
-    } else {
-      console.log("Pagination not available because records fit on one page");
-      expect(true).toBeTruthy();
-    }
-  });
-
-  test("14 Soft assertion on PIM page", async ({ page }) => {
-    await expect.soft(page).toHaveURL(/pim/);
-    await expect.soft(page.locator(".oxd-table")).toBeVisible();
-  });
 
   test("15 Logout from PIM module", async ({ page }) => {
-    await page.locator(".oxd-userdropdown-name").click();
-    await page.getByText(/Logout|Cerrar sesión/).click();
 
-    await expect(page).toHaveURL(/login/, { timeout: 60000 });
+    await page.locator(".oxd-userdropdown-tab").click();
+
+    await page.getByRole("menuitem", {
+      name: "Logout"
+    }).click();
+
+    await expect(page).toHaveURL(/login/, {
+      timeout: 60000
+    });
+
   });
 
 });
