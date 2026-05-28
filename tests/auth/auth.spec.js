@@ -293,32 +293,30 @@ page.locator(
 
 
 // 7 Password masking
-test(
 
-"7 Password masking",
+test("7 Password masking", async ({ page, context }) => {
 
-async({page})=>{
+  await context.clearCookies();
 
-await expect(
+  await page.goto(
+    "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
+    {
+      waitUntil: "domcontentloaded",
+      timeout: 90000
+    }
+  );
 
-page.locator(
+  await expect(
+    page.locator('input[name="username"]')
+  ).toBeVisible({
+    timeout: 60000
+  });
 
-'input[name="password"]'
+  await expect(
+    page.locator('input[name="password"]')
+  ).toHaveAttribute("type", "password");
 
-)
-
-).toHaveAttribute(
-
-"type",
-
-"password"
-
-);
-
-}
-
-);
-
+});
 
 
 
