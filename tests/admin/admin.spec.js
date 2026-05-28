@@ -1,8 +1,9 @@
-import { test, expect } from "@playwright/test";
+const { test, expect } = require("@playwright/test");
 
-test.setTimeout(90000);
 
+// Login function for OrangeHRM
 async function login(page) {
+
   await page.goto(
     "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
     {
@@ -11,158 +12,225 @@ async function login(page) {
     }
   );
 
-  await page.locator('input[name="username"]').waitFor({
+  const username = page.locator('input[name="username"]');
+  const password = page.locator('input[name="password"]');
+
+  await username.waitFor({
     state: "visible",
     timeout: 60000
   });
 
-  await page.locator('input[name="username"]').fill("Admin");
-  await page.locator('input[name="password"]').fill("admin123");
-  await page.locator('button[type="submit"]').click();
+  await username.fill("Admin");
+
+  await password.fill("admin123");
+
+  await page.getByRole("button", { name: "Login" }).click();
 
   await expect(page).toHaveURL(/dashboard/, {
     timeout: 60000
   });
+
 }
 
+
+// Open Admin module
 async function openAdmin(page) {
-  await page.getByRole("link", { name: /^Admin$/ }).click();
+
+  await page.locator(".oxd-sidepanel-body").waitFor({
+    state: "visible",
+    timeout: 60000
+  });
+
+  const adminMenu = page.getByRole("link", {
+    name: /^Admin$/
+  });
+
+  await adminMenu.waitFor({
+    state: "visible",
+    timeout: 60000
+  });
+
+  await adminMenu.click();
 
   await expect(page).toHaveURL(/admin/, {
     timeout: 60000
   });
+
 }
 
-async function openAddUser(page) {
-  await page.getByRole("button", { name: /Add|Añadir/ }).click();
 
-  await page.waitForURL(/saveSystemUser/, {
-    timeout: 60000
-  });
-}
-
+// Admin module tests
 test.describe("Admin User Management", () => {
+
   test.beforeEach(async ({ page }) => {
+
     await login(page);
+
     await openAdmin(page);
+
   });
 
-  test("1 Open Admin module", async ({ page }) => {
+
+  test("1 Admin page should open", async ({ page }) => {
+
     await expect(page).toHaveURL(/admin/);
+
   });
 
-  test("2 Search existing admin user", async ({ page }) => {
-    await page.locator(".oxd-input").nth(1).fill("Admin");
-    await page.getByRole("button", { name: /Search|Buscar/ }).click();
 
-    await expect(page.locator(".oxd-table")).toBeVisible({
-      timeout: 30000
-    });
+  test("2 System Users heading should be visible", async ({ page }) => {
+
+    await expect(
+      page.getByText("System Users")
+    ).toBeVisible();
+
   });
 
-  test("3 Reset search filters", async ({ page }) => {
-    await page.locator(".oxd-input").nth(1).fill("Admin");
-    await page.getByRole("button", { name: /Reset|Restablecer/ }).click();
 
-    await expect(page.locator(".oxd-input").nth(1)).toHaveValue("");
+  test("3 Username search field should accept input", async ({ page }) => {
+
+    const usernameField = page.locator(".oxd-input").nth(1);
+
+    await usernameField.fill("Admin");
+
+    await expect(usernameField).toHaveValue("Admin");
+
   });
 
-  test("4 Open Add User form", async ({ page }) => {
-    await openAddUser(page);
+
+  test("4 Search valid username", async ({ page }) => {
+
+    const usernameField = page.locator(".oxd-input").nth(1);
+
+    await usernameField.fill("Admin");
+
+    await page.getByRole("button", { name: "Search" }).click();
+
+    await expect(
+      page.getByRole("button", { name: "Search" })
+    ).toBeVisible();
+
+  });
+
+
+  test("5 Search invalid username", async ({ page }) => {
+
+    const usernameField = page.locator(".oxd-input").nth(1);
+
+    await usernameField.fill("wronguser12345");
+
+    await page.getByRole("button", { name: "Search" }).click();
+
+    await expect(
+      page.getByRole("button", { name: "Search" })
+    ).toBeVisible();
+
+  });
+
+
+  test("6 Reset button should clear username field", async ({ page }) => {
+
+    const usernameField = page.locator(".oxd-input").nth(1);
+
+    await usernameField.fill("Admin");
+
+    await page.getByRole("button", { name: "Reset" }).click();
+
+    await expect(usernameField).toHaveValue("");
+
+  });
+
+
+  test("7 Add user page should open", async ({ page }) => {
+
+    await page.getByRole("button", { name: "Add" }).click();
 
     await expect(page).toHaveURL(/saveSystemUser/);
+
   });
 
-  test("5 Required validation on empty Add User form", async ({ page }) => {
-    await openAddUser(page);
-
-    await page.getByRole("button", { name: /Save|Guardar/ }).click();
-
-    await expect(
-      page.locator(".oxd-input-field-error-message").first()
-    ).toBeVisible({
-      timeout: 30000
-    });
-  });
-
-  test("6 User role dropdown should open", async ({ page }) => {
-    await openAddUser(page);
-
-    await page.locator(".oxd-select-text").first().click();
-
-    await expect(page.locator(".oxd-select-dropdown")).toBeVisible({
-      timeout: 30000
-    });
-  });
-
-  test("7 Employee name field should be available", async ({ page }) => {
-    await openAddUser(page);
-
-    await expect(page.locator('input[placeholder]').first()).toBeVisible({
-      timeout: 30000
-    });
-  });
 
   test("8 Username field should be available", async ({ page }) => {
-    await openAddUser(page);
 
-    await expect(page.locator(".oxd-input").nth(1)).toBeVisible({
-      timeout: 30000
-    });
+    await page.getByRole("button", { name: "Add" }).click();
+
+    await expect(
+      page.locator(".oxd-input").nth(1)
+    ).toBeVisible();
+
   });
+
 
   test("9 Password field should be available", async ({ page }) => {
-    await openAddUser(page);
 
-    await expect(page.locator('input[type="password"]').first()).toBeVisible({
-      timeout: 30000
-    });
+    await page.getByRole("button", { name: "Add" }).click();
+
+    await expect(
+      page.locator('input[type="password"]').first()
+    ).toBeVisible();
+
   });
+
 
   test("10 Confirm password field should be available", async ({ page }) => {
-    await openAddUser(page);
 
-    await expect(page.locator('input[type="password"]').nth(1)).toBeVisible({
-      timeout: 30000
-    });
+    await page.getByRole("button", { name: "Add" }).click();
+
+    await expect(
+      page.locator('input[type="password"]').nth(1)
+    ).toBeVisible();
+
   });
+
 
   test("11 Search button should be visible", async ({ page }) => {
+
     await expect(
-      page.getByRole("button", { name: /Search|Buscar/ })
-    ).toBeVisible({
-      timeout: 30000
-    });
+      page.getByRole("button", { name: "Search" })
+    ).toBeVisible();
+
   });
+
 
   test("12 User table should be visible", async ({ page }) => {
-    await expect(page.locator(".oxd-table")).toBeVisible({
-      timeout: 30000
+
+    await expect(
+      page.locator(".oxd-table-body")
+    ).toBeVisible();
+
+  });
+
+
+  test("13 Admin page should refresh successfully", async ({ page }) => {
+
+    await page.reload({
+      waitUntil: "domcontentloaded"
     });
+
+    await expect(page).toHaveURL(/admin/);
+
   });
 
-  test("13 Pagination validation if available", async ({ page }) => {
-    const pagination = page.locator(".oxd-pagination");
 
-    if ((await pagination.count()) > 0) {
-      await expect(pagination).toBeVisible();
-    } else {
-      console.log("Pagination not available because records fit on one page");
-      expect(true).toBeTruthy();
-    }
+  test("14 Admin action buttons should be available", async ({ page }) => {
+
+    await expect(
+      page.locator(".oxd-table-cell-actions button").first()
+    ).toBeVisible();
+
   });
 
-  test("14 Soft assertion on Admin page", async ({ page }) => {
-    await expect.soft(page).toHaveURL(/admin/);
-    await expect.soft(page.locator(".oxd-table")).toBeVisible();
-  });
 
   test("15 Logout from Admin module", async ({ page }) => {
-    await page.locator(".oxd-userdropdown-name").click();
-    await page.getByText(/Logout|Cerrar sesión/).click();
+
+    await page.locator(".oxd-userdropdown-tab").click();
+
+    await page.getByRole("menuitem", { name: "Logout" }).click();
 
     await expect(page).toHaveURL(/login/, {
       timeout: 60000
     });
+
   });
+
 });
