@@ -1,15 +1,14 @@
-name: Playwright Daily Reports
+name: Playwright Tests & Allure Report
 
 on:
   push:
-    branches: [ main ]
-
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+      - master
   workflow_dispatch:
-
-  schedule:
-    - cron: '0 0 * * *'
-    # Daily at UTC 00:00
-    # Around 5:30 AM India time
 
 permissions:
   contents: write
@@ -17,100 +16,94 @@ permissions:
   id-token: write
 
 jobs:
-
   test:
-
-    timeout-minutes: 120
-
+    timeout-minutes: 60
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        shard_index: [1, 2, 3]
+
+    env:
+      CI: true
 
     steps:
-
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-
-      - name: Setup NodeJS
+      - name: Setup Node.js
         uses: actions/setup-node@v4
-
         with:
           node-version: lts/*
+          cache: npm
 
-
-      - name: Install dependencies
+      - name: Install Dependencies
         run: npm ci
 
-
-      - name: Install browsers
+      - name: Install Playwright Browsers
         run: npx playwright install --with-deps
 
-
-      - name: Run tests
-        run: |
-
-          npx playwright test --workers=1
-
+      - name: Run Playwright Tests
+        run: npm run test:ci -- --shard=${{ matrix.shard_index }}/3
         continue-on-error: true
 
-
-
-      - name: Generate Allure report
-        run: |
-
-          npx allure generate allure-results \
-          --clean \
-          -o reports/allure-report
-
-
-
-      - name: Upload HTML Report Artifact
+      - name: Upload Allure Raw Results
+        if: always()
         uses: actions/upload-artifact@v4
-
         with:
+          name: allure-results-shard-${{ matrix.shard_index }}
+          path: allure-results
+          if-no-files-found: warn
+          retention-days: 14
 
-          name: html-report
+  report:
+    if: always()
+    needs: [test]
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
 
-          path: reports/html-report
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
 
+      - name: Install Dependencies
+        run: npm ci
 
-      - name: Upload Allure Report Artifact
+      - name: Download Allure Raw Results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-shard-*
+          merge-multiple: true
+          path: allure-results
+
+      - name: Ensure Allure Results Directory
+        run: mkdir -p allure-results
+
+      - name: Generate Allure Report
+        run: npm run allure:generate
+        continue-on-error: true
+
+      - name: Upload Allure HTML Report
+        if: always()
         uses: actions/upload-artifact@v4
-
         with:
-
           name: allure-report
+          path: allure-report
+          if-no-files-found: warn
+          retention-days: 14
 
-          path: reports/allure-report
-
-
-
-
-      - name: Commit updated reports
-        run: |
-
-          git config --global user.email "actions@github.com"
-
-          git config --global user.name "github-actions"
-
-          git add reports/
-
-          git commit -m "Daily report update" || echo "No changes"
-
-          git push
-
-
-
-
-      - name: Deploy reports to GitHub Pages
-
+      - name: Deploy to GitHub Pages
+        if: always() && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')
         uses: peaceiris/actions-gh-pages@v3
-
         with:
-
           github_token: ${{ secrets.GITHUB_TOKEN }}
-
           publish_branch: gh-pages
-
-          publish_dir: reports/allure-report
+          publish_dir: allure-report
+        continue-on-error: true
