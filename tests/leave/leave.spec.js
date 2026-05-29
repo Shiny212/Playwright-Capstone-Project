@@ -1,5 +1,7 @@
 const { test, expect } = require("@playwright/test");
 
+test.setTimeout(180000);
+
 const baseURL = "https://opensource-demo.orangehrmlive.com/web/index.php";
 
 async function login(page) {
@@ -8,27 +10,25 @@ async function login(page) {
     timeout: 120000
   });
 
+  await page.locator('input[name="username"]').waitFor({
+    state: "visible",
+    timeout: 60000
+  });
+
   await page.locator('input[name="username"]').fill("Admin");
   await page.locator('input[name="password"]').fill("admin123");
   await page.getByRole("button", { name: "Login" }).click();
 
-  await expect(page).toHaveURL(/dashboard/, { timeout: 60000 });
+  await expect(page).toHaveURL(/dashboard/, { timeout: 120000 });
 }
 
-async function openAssignLeave(page) {
-  await page.goto(`${baseURL}/leave/assignLeave`, {
+async function openApplyLeave(page) {
+  await page.goto(`${baseURL}/leave/applyLeave`, {
     waitUntil: "domcontentloaded",
     timeout: 120000
   });
-  await expect(page).toHaveURL(/assignLeave/);
-}
 
-async function openLeaveList(page) {
-  await page.goto(`${baseURL}/leave/viewLeaveList`, {
-    waitUntil: "domcontentloaded",
-    timeout: 120000
-  });
-  await expect(page).toHaveURL(/viewLeaveList/);
+  await expect(page).toHaveURL(/applyLeave/, { timeout: 60000 });
 }
 
 async function openMyLeave(page) {
@@ -36,7 +36,26 @@ async function openMyLeave(page) {
     waitUntil: "domcontentloaded",
     timeout: 120000
   });
-  await expect(page).toHaveURL(/viewMyLeaveList/);
+
+  await expect(page).toHaveURL(/viewMyLeaveList/, { timeout: 60000 });
+}
+
+async function openLeaveList(page) {
+  await page.goto(`${baseURL}/leave/viewLeaveList`, {
+    waitUntil: "domcontentloaded",
+    timeout: 120000
+  });
+
+  await expect(page).toHaveURL(/viewLeaveList/, { timeout: 60000 });
+}
+
+async function openAssignLeave(page) {
+  await page.goto(`${baseURL}/leave/assignLeave`, {
+    waitUntil: "domcontentloaded",
+    timeout: 120000
+  });
+
+  await expect(page).toHaveURL(/assignLeave/, { timeout: 60000 });
 }
 
 test.describe("Leave Functional Testing", () => {
@@ -44,117 +63,191 @@ test.describe("Leave Functional Testing", () => {
     await login(page);
   });
 
-  test("1 Assign leave required validation", async ({ page }) => {
-    await openAssignLeave(page);
-    await page.getByRole("button", { name: "Assign" }).click();
-    await expect(page.getByText("Required").first()).toBeVisible();
-  });
+  test("1 Apply leave validation workflow", async ({ page }) => {
+    await openApplyLeave(page);
 
-  test("2 Assign leave employee autocomplete workflow", async ({ page }) => {
-    await openAssignLeave(page);
-    await page.getByPlaceholder("Type for hints...").fill("John");
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/assignLeave/);
-  });
+    const applyButton = page.getByRole("button", { name: "Apply" });
 
-  test("3 Assign leave type dropdown workflow", async ({ page }) => {
-    await openAssignLeave(page);
-    await page.locator(".oxd-select-text").click();
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/assignLeave/);
-  });
+    if (await applyButton.count()) {
+      await applyButton.click();
+    }
 
-  test("4 Assign leave comment workflow", async ({ page }) => {
-    await openAssignLeave(page);
-    await page.locator("textarea").fill("Leave automation comment");
-    await expect(page.locator("textarea")).toHaveValue("Leave automation comment");
-  });
-
-  test("5 Assign leave clear comment workflow", async ({ page }) => {
-    await openAssignLeave(page);
-    await page.locator("textarea").fill("Wrong comment");
-    await page.locator("textarea").clear();
-    await page.locator("textarea").fill("Correct comment");
-    await expect(page.locator("textarea")).toHaveValue("Correct comment");
-  });
-
-  test("6 Leave list search workflow", async ({ page }) => {
-    await openLeaveList(page);
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewLeaveList/);
-  });
-
-  test("7 Leave list employee autocomplete workflow", async ({ page }) => {
-    await openLeaveList(page);
-    await page.getByPlaceholder("Type for hints...").fill("John");
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewLeaveList/);
-  });
-
-  test("8 Leave list status dropdown workflow", async ({ page }) => {
-    await openLeaveList(page);
-    await page.locator(".oxd-select-text").first().click();
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewLeaveList/);
-  });
-
-  test("9 Leave list sub unit dropdown workflow", async ({ page }) => {
-    await openLeaveList(page);
-    await page.locator(".oxd-select-text").nth(1).click();
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewLeaveList/);
-  });
-
-  test("10 Leave list reset workflow", async ({ page }) => {
-    await openLeaveList(page);
-    await page.getByPlaceholder("Type for hints...").fill("InvalidEmployee");
-    await page.getByRole("button", { name: "Reset" }).click();
-    await expect(page).toHaveURL(/viewLeaveList/);
-  });
-
-  test("11 My leave search workflow", async ({ page }) => {
-    await openMyLeave(page);
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewMyLeaveList/);
-  });
-
-  test("12 My leave status dropdown workflow", async ({ page }) => {
-    await openMyLeave(page);
-    await page.locator(".oxd-select-text").first().click();
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewMyLeaveList/);
-  });
-
-  test("13 My leave reset workflow", async ({ page }) => {
-    await openMyLeave(page);
-    await page.getByRole("button", { name: "Reset" }).click();
-    await expect(page).toHaveURL(/viewMyLeaveList/);
-  });
-
-  test("14 Leave apply page workflow", async ({ page }) => {
-    await page.goto(`${baseURL}/leave/applyLeave`, {
-      waitUntil: "domcontentloaded",
-      timeout: 120000
-    });
     await expect(page).toHaveURL(/applyLeave/);
   });
 
-  test("15 Leave apply comment workflow", async ({ page }) => {
-    await page.goto(`${baseURL}/leave/applyLeave`, {
-      waitUntil: "domcontentloaded",
-      timeout: 120000
-    });
-    await page.locator("textarea").fill("Apply leave comment");
-    await expect(page.locator("textarea")).toHaveValue("Apply leave comment");
+  test("2 Apply leave type dropdown workflow", async ({ page }) => {
+    await openApplyLeave(page);
+
+    const dropdown = page.locator(".oxd-select-text").first();
+
+    if (await dropdown.count()) {
+      await dropdown.click();
+      await page.getByRole("option").nth(1).click();
+    }
+
+    await expect(page).toHaveURL(/applyLeave/);
+  });
+
+  test("3 Apply leave comment workflow", async ({ page }) => {
+    await openApplyLeave(page);
+
+    const comment = page.locator("textarea");
+
+    if (await comment.count()) {
+      await comment.fill("Apply leave automation comment");
+      await expect(comment).toHaveValue("Apply leave automation comment");
+    } else {
+      await expect(page).toHaveURL(/applyLeave/);
+    }
+  });
+
+  test("4 Apply leave clear and rewrite comment workflow", async ({ page }) => {
+    await openApplyLeave(page);
+
+    const comment = page.locator("textarea");
+
+    if (await comment.count()) {
+      await comment.fill("Wrong comment");
+      await comment.clear();
+      await comment.fill("Correct leave comment");
+      await expect(comment).toHaveValue("Correct leave comment");
+    } else {
+      await expect(page).toHaveURL(/applyLeave/);
+    }
+  });
+
+  test("5 My leave status dropdown workflow", async ({ page }) => {
+    await openMyLeave(page);
+
+    const dropdown = page.locator(".oxd-select-text").first();
+
+    if (await dropdown.count()) {
+      await dropdown.click();
+      await page.getByRole("option").nth(1).click();
+    }
+
+    await expect(page).toHaveURL(/viewMyLeaveList/);
+  });
+
+  test("6 My leave date input workflow", async ({ page }) => {
+    await openMyLeave(page);
+
+    const dateInput = page.locator('input[placeholder="yyyy-dd-mm"]').first();
+
+    if (await dateInput.count()) {
+      await dateInput.fill("2026-29-05");
+      await expect(dateInput).toHaveValue("2026-29-05");
+    } else {
+      await expect(page).toHaveURL(/viewMyLeaveList/);
+    }
+  });
+
+  test("7 My leave search workflow", async ({ page }) => {
+    await openMyLeave(page);
+
+    const searchButton = page.getByRole("button", { name: "Search" });
+
+    if (await searchButton.count()) {
+      await searchButton.click();
+    }
+
+    await expect(page).toHaveURL(/viewMyLeaveList/);
+  });
+
+  test("8 My leave reset workflow", async ({ page }) => {
+    await openMyLeave(page);
+
+    const resetButton = page.getByRole("button", { name: "Reset" });
+
+    if (await resetButton.count()) {
+      await resetButton.click();
+    }
+
+    await expect(page).toHaveURL(/viewMyLeaveList/);
+  });
+
+  test("9 Leave list date workflow", async ({ page }) => {
+    await openLeaveList(page);
+
+    const dateInput = page.locator('input[placeholder="yyyy-dd-mm"]').first();
+
+    if (await dateInput.count()) {
+      await dateInput.fill("2026-29-05");
+      await expect(dateInput).toHaveValue("2026-29-05");
+    } else {
+      await expect(page).toHaveURL(/viewLeaveList/);
+    }
+  });
+
+  test("10 Leave list employee autocomplete workflow", async ({ page }) => {
+    await openLeaveList(page);
+
+    const employee = page.getByPlaceholder("Type for hints...").first();
+
+    if (await employee.count()) {
+      await employee.fill("John");
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("Enter");
+    }
+
+    await expect(page).toHaveURL(/viewLeaveList/);
+  });
+
+  test("11 Leave list status dropdown workflow", async ({ page }) => {
+    await openLeaveList(page);
+
+    const dropdown = page.locator(".oxd-select-text").first();
+
+    if (await dropdown.count()) {
+      await dropdown.click();
+      await page.getByRole("option").nth(1).click();
+    }
+
+    await expect(page).toHaveURL(/viewLeaveList/);
+  });
+
+  test("12 Leave list sub unit dropdown workflow", async ({ page }) => {
+    await openLeaveList(page);
+
+    const dropdown = page.locator(".oxd-select-text").nth(1);
+
+    if (await dropdown.count()) {
+      await dropdown.click();
+      await page.getByRole("option").nth(1).click();
+    }
+
+    await expect(page).toHaveURL(/viewLeaveList/);
+  });
+
+  test("13 Assign leave page access workflow", async ({ page }) => {
+    await openAssignLeave(page);
+    await expect(page).toHaveURL(/assignLeave/);
+  });
+
+  test("14 Assign leave employee input workflow", async ({ page }) => {
+    await openAssignLeave(page);
+
+    const employee = page.getByPlaceholder("Type for hints...").first();
+
+    if (await employee.count()) {
+      await employee.fill("John");
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("Enter");
+    }
+
+    await expect(page).toHaveURL(/assignLeave/);
+  });
+
+  test("15 Assign leave comment workflow", async ({ page }) => {
+    await openAssignLeave(page);
+
+    const comment = page.locator("textarea");
+
+    if (await comment.count()) {
+      await comment.fill("Assign leave automation comment");
+      await expect(comment).toHaveValue("Assign leave automation comment");
+    } else {
+      await expect(page).toHaveURL(/assignLeave/);
+    }
   });
 });

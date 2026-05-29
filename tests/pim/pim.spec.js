@@ -1,128 +1,334 @@
 const { test, expect } = require("@playwright/test");
 
+test.setTimeout(180000);
+
+const baseURL = "https://opensource-demo.orangehrmlive.com/web/index.php";
+
 async function login(page) {
-  await page.goto("https://opensource-demo.orangehrmlive.com/web/index.php/auth/login");
+  await page.goto(`${baseURL}/auth/login`, {
+    waitUntil: "domcontentloaded",
+    timeout: 120000
+  });
+
+  await page.locator('input[name="username"]').waitFor({
+    state: "visible",
+    timeout: 60000
+  });
+
   await page.locator('input[name="username"]').fill("Admin");
   await page.locator('input[name="password"]').fill("admin123");
-  await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/dashboard/);
+  await page.getByRole("button", { name: "Login" }).click();
+
+  await expect(page).toHaveURL(/dashboard/, { timeout: 120000 });
 }
 
-async function openPIM(page) {
-  await page.getByRole("link", { name: "PIM" }).click();
-  await expect(page).toHaveURL(/pim/);
+async function createEmployee(page) {
+  const unique = Date.now().toString().slice(-6);
+  const empId = "9" + unique;
+
+  await page.goto(`${baseURL}/pim/addEmployee`, {
+    waitUntil: "domcontentloaded",
+    timeout: 120000
+  });
+
+  await page.locator('input[name="firstName"]').fill("Auto");
+  await page.locator('input[name="middleName"]').fill("PIM");
+  await page.locator('input[name="lastName"]').fill("User");
+
+  const employeeId = page.locator(".oxd-input").nth(4);
+  await employeeId.clear();
+  await employeeId.fill(empId);
+
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(page).toHaveURL(/viewPersonalDetails/, {
+    timeout: 120000
+  });
+
+  const url = page.url();
+  const empNumber = url.split("/empNumber/")[1];
+
+  return { empId, empNumber, unique };
 }
 
-test.describe("PIM Functional Testing", () => {
+async function openEmployeePage(page, empNumber, pageName) {
+  await page.goto(`${baseURL}/pim/${pageName}/empNumber/${empNumber}`, {
+    waitUntil: "domcontentloaded",
+    timeout: 120000
+  });
+}
 
+test.describe("PIM Important Functional Testing", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
-    await openPIM(page);
   });
 
-  test("1 Search employee by name", async ({ page }) => {
-    await page.getByPlaceholder("Type for hints...").first().fill("Linda");
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewEmployeeList/);
-  });
-
-  test("2 Search employee by invalid name", async ({ page }) => {
-    await page.getByPlaceholder("Type for hints...").first().fill("WrongEmployee");
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewEmployeeList/);
-  });
-
-  test("3 Search employee by ID", async ({ page }) => {
-    await page.locator(".oxd-input").nth(1).fill("1234");
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewEmployeeList/);
-  });
-
-  test("4 Reset employee filter", async ({ page }) => {
-    await page.locator(".oxd-input").nth(1).fill("1234");
-    await page.getByRole("button", { name: "Reset" }).click();
-    await expect(page.locator(".oxd-input").nth(1)).toHaveValue("");
-  });
-
-  test("5 Search again after reset", async ({ page }) => {
-    await page.getByPlaceholder("Type for hints...").first().fill("WrongEmployee");
-    await page.getByRole("button", { name: "Reset" }).click();
-    await page.getByPlaceholder("Type for hints...").first().fill("Linda");
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewEmployeeList/);
-  });
-
-  test("6 Add employee empty form validation", async ({ page }) => {
-    await page.getByRole("button", { name: "Add" }).click();
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Required").first()).toBeVisible();
-  });
-
-  test("7 Add employee cancel workflow", async ({ page }) => {
-    await page.getByRole("button", { name: "Add" }).click();
-    await page.getByRole("button", { name: "Cancel" }).click();
-    await expect(page).toHaveURL(/viewEmployeeList/);
-  });
-
-  test("8 Add employee with unique ID", async ({ page }) => {
-    const empId = "9" + Date.now().toString().slice(-5);
-    await page.getByRole("button", { name: "Add" }).click();
-    await page.locator('input[name="firstName"]').fill("Auto");
-    await page.locator('input[name="lastName"]').fill("User");
-    await page.locator(".oxd-input").nth(4).clear();
-    await page.locator(".oxd-input").nth(4).fill(empId);
-    await page.getByRole("button", { name: "Save" }).click();
+  test("1 Add employee with mandatory details", async ({ page }) => {
+    await createEmployee(page);
     await expect(page).toHaveURL(/viewPersonalDetails/);
   });
 
-  test("9 Add employee with login details validation", async ({ page }) => {
-    await page.getByRole("button", { name: "Add" }).click();
+  test("2 Add employee with login details", async ({ page }) => {
+    const unique = Date.now().toString().slice(-6);
+
+    await page.goto(`${baseURL}/pim/addEmployee`, {
+      waitUntil: "domcontentloaded",
+      timeout: 120000
+    });
+
+    await page.locator('input[name="firstName"]').fill("Login");
+    await page.locator('input[name="lastName"]').fill("User");
+
+    const employeeId = page.locator(".oxd-input").nth(4);
+    await employeeId.clear();
+    await employeeId.fill("8" + unique);
+
     await page.locator(".oxd-switch-input").click();
+    await page.locator(".oxd-input").nth(5).fill(`user${unique}`);
+    await page.locator('input[type="password"]').nth(0).fill("Password@123");
+    await page.locator('input[type="password"]').nth(1).fill("Password@123");
+
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page).toHaveURL(/viewPersonalDetails/, {
+      timeout: 120000
+    });
+  });
+
+  test("3 Add employee required field validation", async ({ page }) => {
+    await page.goto(`${baseURL}/pim/addEmployee`, {
+      waitUntil: "domcontentloaded",
+      timeout: 120000
+    });
+
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.getByText("Required").first()).toBeVisible();
   });
 
-  test("10 Search with special characters", async ({ page }) => {
-    await page.getByPlaceholder("Type for hints...").first().fill("@@@###");
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewEmployeeList/);
+  test("4 Edit employee personal details", async ({ page }) => {
+    const employee = await createEmployee(page);
+
+    await openEmployeePage(page, employee.empNumber, "viewPersonalDetails");
+
+    await page.locator(".oxd-input").nth(5).fill("Tester");
+    await page.getByRole("button", { name: "Save" }).first().click();
+
+    await expect(page.getByText("Successfully Updated")).toBeVisible({
+      timeout: 60000
+    });
   });
 
-  test("11 Search with long employee name", async ({ page }) => {
-    await page.getByPlaceholder("Type for hints...").first().fill("Very Long Invalid Employee Name Testing");
-    await page.getByRole("button", { name: "Search" }).click();
-    await expect(page).toHaveURL(/viewEmployeeList/);
+  test("5 Edit employee contact details", async ({ page }) => {
+    const employee = await createEmployee(page);
+
+    await openEmployeePage(page, employee.empNumber, "contactDetails");
+
+    await page.locator(".oxd-input").nth(1).fill("Chennai");
+    await page.locator(".oxd-input").nth(3).fill("Tamil Nadu");
+    await page.locator(".oxd-input").nth(5).fill("600001");
+
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Successfully Updated")).toBeVisible({
+      timeout: 60000
+    });
   });
 
-  test("12 Refresh after employee search", async ({ page }) => {
-    await page.getByPlaceholder("Type for hints...").first().fill("Linda");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.reload();
-    await expect(page).toHaveURL(/viewEmployeeList/);
+  test("6 Add emergency contact", async ({ page }) => {
+    const employee = await createEmployee(page);
+
+    await openEmployeePage(page, employee.empNumber, "viewEmergencyContacts");
+
+    await page.getByRole("button", { name: "Add" }).first().click();
+    await page.locator(".oxd-input").nth(1).fill("Parent");
+    await page.locator(".oxd-input").nth(2).fill("Father");
+    await page.locator(".oxd-input").nth(3).fill("9876543210");
+
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Successfully Saved")).toBeVisible({
+      timeout: 60000
+    });
   });
 
-  test("13 Navigate PIM to Admin after search", async ({ page }) => {
-    await page.getByPlaceholder("Type for hints...").first().fill("Linda");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("link", { name: "Admin" }).click();
-    await expect(page).toHaveURL(/admin/);
+  test("7 Edit emergency contact", async ({ page }) => {
+    const employee = await createEmployee(page);
+
+    await openEmployeePage(page, employee.empNumber, "viewEmergencyContacts");
+
+    await page.getByRole("button", { name: "Add" }).first().click();
+    await page.locator(".oxd-input").nth(1).fill("Parent");
+    await page.locator(".oxd-input").nth(2).fill("Father");
+    await page.locator(".oxd-input").nth(3).fill("9876543210");
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Successfully Saved")).toBeVisible({
+      timeout: 60000
+    });
+
+    await page.locator(".oxd-icon.bi-pencil-fill").first().click();
+    await page.locator(".oxd-input").nth(3).fill("9876500000");
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Successfully Updated")).toBeVisible({
+      timeout: 60000
+    });
   });
 
-  test("14 Navigate PIM to Leave after search", async ({ page }) => {
-    await page.getByPlaceholder("Type for hints...").first().fill("Linda");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.getByRole("link", { name: "Leave" }).click();
-    await expect(page).toHaveURL(/leave/);
+  test("8 Add dependent details", async ({ page }) => {
+    const employee = await createEmployee(page);
+
+    await openEmployeePage(page, employee.empNumber, "viewDependents");
+
+    await page.getByRole("button", { name: "Add" }).first().click();
+    await page.locator(".oxd-input").nth(1).fill("Child One");
+
+    await page.locator(".oxd-select-text").click();
+    await page.getByRole("option").nth(1).click();
+
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Successfully Saved")).toBeVisible({
+      timeout: 60000
+    });
   });
 
-  test("15 Logout after PIM workflow", async ({ page }) => {
-    await page.getByPlaceholder("Type for hints...").first().fill("Linda");
-    await page.getByRole("button", { name: "Search" }).click();
-    await page.locator(".oxd-userdropdown-tab").click();
-    await page.getByRole("menuitem", { name: "Logout" }).click();
-    await expect(page).toHaveURL(/login/);
+  test("9 Edit dependent details", async ({ page }) => {
+    const employee = await createEmployee(page);
+
+    await openEmployeePage(page, employee.empNumber, "viewDependents");
+
+    await page.getByRole("button", { name: "Add" }).first().click();
+    await page.locator(".oxd-input").nth(1).fill("Child One");
+    await page.locator(".oxd-select-text").click();
+    await page.getByRole("option").nth(1).click();
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Successfully Saved")).toBeVisible({
+      timeout: 60000
+    });
+
+    await page.locator(".oxd-icon.bi-pencil-fill").first().click();
+    await page.locator(".oxd-input").nth(1).fill("Child Updated");
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Successfully Updated")).toBeVisible({
+      timeout: 60000
+    });
   });
 
+  test("10 Update job details", async ({ page }) => {
+    const employee = await createEmployee(page);
+
+    await openEmployeePage(page, employee.empNumber, "viewJobDetails");
+
+    const joinedDate = page.locator('input[placeholder="yyyy-dd-mm"]').first();
+
+    if (await joinedDate.count()) {
+      await joinedDate.fill("2026-29-05");
+    }
+
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Successfully Updated")).toBeVisible({
+      timeout: 60000
+    });
+  });
+
+  test("11 Salary details input workflow", async ({ page }) => {
+    const employee = await createEmployee(page);
+
+    await openEmployeePage(page, employee.empNumber, "viewSalaryList");
+
+    await page.getByRole("button", { name: "Add" }).first().click();
+
+    await page.locator(".oxd-input").nth(1).fill("Basic Salary");
+
+    await page.locator(".oxd-select-text").first().click();
+    await page.getByRole("option").nth(1).click();
+
+    await page.locator(".oxd-input").nth(2).fill("25000");
+
+    await expect(page.locator(".oxd-input").nth(1)).toHaveValue("Basic Salary");
+    await expect(page.locator(".oxd-input").nth(2)).toHaveValue("25000");
+  });
+
+  test("12 Add immigration details", async ({ page }) => {
+    const employee = await createEmployee(page);
+
+    await openEmployeePage(page, employee.empNumber, "viewImmigration");
+
+    await page.getByRole("button", { name: "Add" }).first().click();
+
+    await page.locator(".oxd-input").nth(1).fill("A1234567");
+
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Successfully Saved")).toBeVisible({
+      timeout: 60000
+    });
+  });
+
+  test("13 Add employee attachment", async ({ page }) => {
+    const employee = await createEmployee(page);
+
+    await openEmployeePage(page, employee.empNumber, "viewPersonalDetails");
+
+    await page.getByRole("button", { name: "Add" }).last().click();
+
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "employee-document.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Employee document uploaded using Playwright")
+    });
+
+    await page.locator("textarea").fill("Employee attachment document");
+    await page.getByRole("button", { name: "Save" }).last().click();
+
+    await expect(page.getByText("Successfully Saved")).toBeVisible({
+      timeout: 60000
+    });
+  });
+
+  test("14 Add employee login password mismatch validation", async ({ page }) => {
+    const unique = Date.now().toString().slice(-6);
+
+    await page.goto(`${baseURL}/pim/addEmployee`, {
+      waitUntil: "domcontentloaded",
+      timeout: 120000
+    });
+
+    await page.locator('input[name="firstName"]').fill("Mismatch");
+    await page.locator('input[name="lastName"]').fill("User");
+
+    await page.locator(".oxd-switch-input").click();
+
+    await page.locator(".oxd-input").nth(5).fill(`mismatch${unique}`);
+    await page.locator('input[type="password"]').nth(0).fill("Password@123");
+    await page.locator('input[type="password"]').nth(1).fill("Wrong@123");
+
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Passwords do not match").first()).toBeVisible({
+      timeout: 60000
+    });
+  });
+
+  test("15 Add employee login details required validation", async ({ page }) => {
+    await page.goto(`${baseURL}/pim/addEmployee`, {
+      waitUntil: "domcontentloaded",
+      timeout: 120000
+    });
+
+    await page.locator('input[name="firstName"]').fill("Login");
+    await page.locator('input[name="lastName"]').fill("Validation");
+
+    await page.locator(".oxd-switch-input").click();
+
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(page.getByText("Required").first()).toBeVisible({
+      timeout: 60000
+    });
+  });
 });
