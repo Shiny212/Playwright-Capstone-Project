@@ -4,3 +4,4 @@ playwright/.cache/
 playwright/.auth/
 auth.json
 allure-results/
+.env

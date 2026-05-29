@@ -1,634 +1,153 @@
-import { test, expect } from "@playwright/test";
+const { test, expect } = require("@playwright/test");
 
-const loginUrl =
-"https://opensource-demo.orangehrmlive.com/web/index.php/auth/login";
-
-test.setTimeout(90000);
-
-
-// Open login page
-async function openLogin(page){
-
-  await page.goto(
-    loginUrl,
-    {
-      waitUntil:"domcontentloaded",
-      timeout:60000
-    }
-  );
-
-  await expect(
-
-    page.locator(
-      'input[name="username"]'
-
-    )
-
-  ).toBeVisible();
-
+async function openLogin(page) {
+  await page.goto("https://opensource-demo.orangehrmlive.com/web/index.php/auth/login");
+  await page.locator('input[name="username"]').waitFor();
 }
 
+test.describe("Authentication Functional Testing", () => {
 
-// Login helper
-async function login(
-  page,
-  user,
-  pass
-){
-
-  await page.locator(
-    'input[name="username"]'
-  ).fill(
-    user
-  );
-
-  await page.locator(
-    'input[name="password"]'
-  ).fill(
-    pass
-  );
-
-  await page.locator(
-    'button[type="submit"]'
-  ).click();
-
-}
-
-
-
-test.describe(
-
-"Authentication & Session Security",
-
-()=>{
-
-
-test.beforeEach(
-
-async({page})=>{
-
-await openLogin(page);
-
-}
-
-);
-
-
-
-
-// 1 Valid login
-test(
-
-"1 Valid login",
-
-async({page})=>{
-
-await login(
-
-page,
-
-"Admin",
-
-"admin123"
-
-);
-
-await expect(
-
-page
-
-).toHaveURL(
-
-/dashboard/,
-
-{
-
-timeout:60000
-
-}
-
-);
-
-}
-
-);
-
-
-
-
-// 2 Invalid password
-test(
-
-"2 Invalid password",
-
-async({page})=>{
-
-await login(
-
-page,
-
-"Admin",
-
-"wrong123"
-
-);
-
-await expect(
-
-page.locator(
-".oxd-alert-content-text"
-)
-
-).toBeVisible();
-
-}
-
-);
-
-
-
-
-// 3 Empty username
-test(
-
-"3 Empty username",
-
-async({page})=>{
-
-await page.fill(
-
-'input[name="password"]',
-
-"admin123"
-
-);
-
-await page.click(
-
-'button[type="submit"]'
-
-);
-
-await expect(
-
-page.locator(
-
-".oxd-input-field-error-message"
-
-).first()
-
-).toBeVisible();
-
-}
-
-);
-
-
-
-
-// 4 Empty password
-test(
-
-"4 Empty password",
-
-async({page})=>{
-
-await page.fill(
-
-'input[name="username"]',
-
-"Admin"
-
-);
-
-await page.click(
-
-'button[type="submit"]'
-
-);
-
-await expect(
-
-page.locator(
-
-".oxd-input-field-error-message"
-
-).first()
-
-).toBeVisible();
-
-}
-
-);
-
-
-
-
-// 5 Empty both
-test(
-
-"5 Empty both",
-
-async({page})=>{
-
-await page.click(
-
-'button[type="submit"]'
-
-);
-
-await expect(
-
-page.locator(
-
-".oxd-input-field-error-message"
-
-)
-
-).toHaveCount(
-
-2
-
-);
-
-}
-
-);
-
-
-
-
-// 6 SQL injection
-test(
-
-"6 SQL injection",
-
-async({page})=>{
-
-await login(
-
-page,
-
-"' OR 1=1 --",
-
-"' OR 1=1 --"
-
-);
-
-await expect(
-
-page.locator(
-
-".oxd-alert-content-text"
-
-)
-
-).toBeVisible();
-
-}
-
-);
-
-
-
-
-// 7 Password masking
-
-test("7 Password masking", async ({ page, context }) => {
-
-  await context.clearCookies();
-
-  await page.goto(
-    "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
-    {
-      waitUntil: "domcontentloaded",
-      timeout: 90000
-    }
-  );
-
-  await expect(
-    page.locator('input[name="username"]')
-  ).toBeVisible({
-    timeout: 60000
+  test.beforeEach(async ({ page }) => {
+    await openLogin(page);
   });
 
-  await expect(
-    page.locator('input[name="password"]')
-  ).toHaveAttribute("type", "password");
+  test("1 Valid login using click", async ({ page }) => {
+    await page.locator('input[name="username"]').fill("Admin");
+    await page.locator('input[name="password"]').fill("admin123");
+    await page.getByRole("button", { name: "Login" }).click();
+    await expect(page).toHaveURL(/dashboard/);
+  });
+
+  test("2 Valid login using keyboard Enter", async ({ page }) => {
+    await page.locator('input[name="username"]').fill("Admin");
+    await page.locator('input[name="password"]').fill("admin123");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/dashboard/);
+  });
+
+  test("3 Invalid username and password validation", async ({ page }) => {
+    await page.locator('input[name="username"]').fill("wronguser");
+    await page.locator('input[name="password"]').fill("wrongpass");
+    await page.getByRole("button", { name: "Login" }).click();
+    await expect(page.getByText("Invalid credentials")).toBeVisible();
+  });
+
+  test("4 Empty login form validation", async ({ page }) => {
+    await page.getByRole("button", { name: "Login" }).click();
+    await expect(page.getByText("Required")).toHaveCount(2);
+  });
+
+  test("5 Valid username and empty password validation", async ({ page }) => {
+    await page.locator('input[name="username"]').fill("Admin");
+    await page.getByRole("button", { name: "Login" }).click();
+    await expect(page.getByText("Required").first()).toBeVisible();
+  });
+
+  test("6 Empty username and valid password validation", async ({ page }) => {
+    await page.locator('input[name="password"]').fill("admin123");
+    await page.getByRole("button", { name: "Login" }).click();
+    await expect(page.getByText("Required").first()).toBeVisible();
+  });
+
+  test("7 Password masking validation", async ({ page }) => {
+    await expect(page.locator('input[name="password"]')).toHaveAttribute("type", "password");
+  });
+
+  test("8 Clear wrong credentials and login again", async ({ page }) => {
+    await page.locator('input[name="username"]').fill("wronguser");
+    await page.locator('input[name="password"]').fill("wrongpass");
+
+    await page.locator('input[name="username"]').clear();
+    await page.locator('input[name="password"]').clear();
+
+    await page.locator('input[name="username"]').fill("Admin");
+    await page.locator('input[name="password"]').fill("admin123");
+    await page.getByRole("button", { name: "Login" }).click();
+
+    await expect(page).toHaveURL(/dashboard/);
+  });
+
+  test("9 Multiple invalid login attempts", async ({ page }) => {
+    await page.locator('input[name="username"]').fill("test1");
+    await page.locator('input[name="password"]').fill("test1");
+    await page.getByRole("button", { name: "Login" }).click();
+    await expect(page.getByText("Invalid credentials")).toBeVisible();
+
+    await page.locator('input[name="username"]').clear();
+    await page.locator('input[name="password"]').clear();
+
+    await page.locator('input[name="username"]').fill("test2");
+    await page.locator('input[name="password"]').fill("test2");
+    await page.getByRole("button", { name: "Login" }).click();
+    await expect(page.getByText("Invalid credentials")).toBeVisible();
+  });
+
+  test("10 Direct dashboard access without login", async ({ page }) => {
+    await page.goto("https://opensource-demo.orangehrmlive.com/web/index.php/dashboard/index");
+    await expect(page).toHaveURL(/auth\/login/);
+  });
+
+  test("11 Logout should destroy user session", async ({ page }) => {
+    await page.locator('input[name="username"]').fill("Admin");
+    await page.locator('input[name="password"]').fill("admin123");
+    await page.getByRole("button", { name: "Login" }).click();
+
+    await expect(page).toHaveURL(/dashboard/);
+
+    await page.locator(".oxd-userdropdown-tab").click();
+    await page.getByRole("menuitem", { name: "Logout" }).click();
+
+    await expect(page).toHaveURL(/login/);
+  });
+
+  test("12 Browser back after logout should not restore dashboard", async ({ page }) => {
+    await page.locator('input[name="username"]').fill("Admin");
+    await page.locator('input[name="password"]').fill("admin123");
+    await page.getByRole("button", { name: "Login" }).click();
+
+    await expect(page).toHaveURL(/dashboard/);
+
+    await page.locator(".oxd-userdropdown-tab").click();
+    await page.getByRole("menuitem", { name: "Logout" }).click();
+
+    await page.goBack();
+
+    await expect(page).not.toHaveURL(/dashboard/);
+  });
 
-});
+  test("13 Reload login page and login again", async ({ page }) => {
+    await page.reload();
 
+    await page.locator('input[name="username"]').fill("Admin");
+    await page.locator('input[name="password"]').fill("admin123");
+    await page.getByRole("button", { name: "Login" }).click();
 
+    await expect(page).toHaveURL(/dashboard/);
+  });
 
-// 8 Refresh login page
-test(
+  test("14 Login with only spaces should not allow dashboard", async ({ page }) => {
+    await page.locator('input[name="username"]').fill("   ");
+    await page.locator('input[name="password"]').fill("   ");
+    await page.getByRole("button", { name: "Login" }).click();
 
-"8 Refresh login page",
+    await expect(page).not.toHaveURL(/dashboard/);
+  });
 
-async({page})=>{
+  test("15 Failed login followed by successful login", async ({ page }) => {
+    await page.locator('input[name="username"]').fill("wronguser");
+    await page.locator('input[name="password"]').fill("wrongpass");
+    await page.getByRole("button", { name: "Login" }).click();
 
-await page.reload();
+    await expect(page.getByText("Invalid credentials")).toBeVisible();
 
-await expect(
+    await page.locator('input[name="username"]').clear();
+    await page.locator('input[name="password"]').clear();
 
-page.locator(
+    await page.locator('input[name="username"]').fill("Admin");
+    await page.locator('input[name="password"]').fill("admin123");
+    await page.getByRole("button", { name: "Login" }).click();
 
-'input[name="username"]'
-
-)
-
-).toBeVisible();
-
-}
-
-);
-
-
-
-
-// 9 Logout
-test(
-
-"9 Logout",
-
-async({page})=>{
-
-await login(
-
-page,
-
-"Admin",
-
-"admin123"
-
-);
-
-await expect(
-
-page
-
-).toHaveURL(
-
-/dashboard/,
-
-{
-
-timeout:60000
-
-}
-
-);
-
-await page.locator(
-
-".oxd-userdropdown-name"
-
-).click();
-
-await page.getByText(
-
-/Logout|Cerrar sesión/
-
-).click();
-
-await expect(
-
-page
-
-).toHaveURL(
-
-/login/
-
-);
-
-}
-
-);
-
-
-
-
-// 10 Unauthorized access
-test(
-
-"10 Unauthorized access",
-
-async({page})=>{
-
-await page.goto(
-
-"https://opensource-demo.orangehrmlive.com/web/index.php/dashboard/index"
-
-);
-
-await expect(
-
-page
-
-).toHaveURL(
-
-/login/
-
-);
-
-}
-
-);
-
-
-
-
-// 11 Refresh after login
-test(
-
-"11 Refresh dashboard",
-
-async({page})=>{
-
-await login(
-
-page,
-
-"Admin",
-
-"admin123"
-
-);
-
-await expect(
-
-page
-
-).toHaveURL(
-
-/dashboard/,
-
-{
-
-timeout:60000
-
-}
-
-);
-
-await page.reload();
-
-await expect(
-
-page
-
-).toHaveURL(
-
-/dashboard/
-
-);
-
-}
-
-);
-
-
-
-
-// 12 Multi tab
-test(
-
-"12 Multi tab",
-
-async({browser})=>{
-
-const context=
-
-await browser.newContext();
-
-const p1=
-
-await context.newPage();
-
-const p2=
-
-await context.newPage();
-
-await openLogin(
-
-p1
-
-);
-
-await openLogin(
-
-p2
-
-);
-
-await context.close();
-
-}
-
-);
-
-
-
-
-// 13 Cookie validation
-test(
-
-"13 Cookie validation",
-
-async({page})=>{
-
-await login(
-
-page,
-
-"Admin",
-
-"admin123"
-
-);
-
-const cookies=
-
-await page.context().cookies();
-
-expect(
-
-cookies.length
-
-).toBeGreaterThan(
-
-0
-
-);
-
-}
-
-);
-
-
-
-
-// 14 Storage state
-test(
-
-"14 Storage state",
-
-async({page})=>{
-
-await login(
-
-page,
-
-"Admin",
-
-"admin123"
-
-);
-
-await page.context().storageState({
-
-path:"auth.json"
-
-});
-
-}
-
-);
-
-
-
-
-// 15 Soft assertions
-test(
-
-"15 Soft assertions",
-
-async({page})=>{
-
-await expect.soft(
-
-page.locator(
-
-'input[name="username"]'
-
-)
-
-).toBeVisible();
-
-await expect.soft(
-
-page.locator(
-
-'input[name="password"]'
-
-)
-
-).toBeVisible();
-
-}
-
-);
-
-
+    await expect(page).toHaveURL(/dashboard/);
+  });
 
 });

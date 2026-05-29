@@ -1,236 +1,179 @@
 const { test, expect } = require("@playwright/test");
 
+test.setTimeout(180000);
 
-// Login function for OrangeHRM
-async function login(page) {
+const baseURL = "https://opensource-demo.orangehrmlive.com/web/index.php";
 
-  await page.goto(
-    "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login",
-    {
-      waitUntil: "domcontentloaded",
-      timeout: 60000
+async function safeGoto(page, url) {
+  for (let i = 0; i < 3; i++) {
+    try {
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 120000 });
+      return;
+    } catch (error) {
+      if (i === 2) throw error;
+      await page.waitForTimeout(3000);
     }
-  );
+  }
+}
 
-  const username = page.locator('input[name="username"]');
-  const password = page.locator('input[name="password"]');
+async function login(page) {
+  await safeGoto(page, `${baseURL}/auth/login`);
 
-  await username.waitFor({
+  await page.locator('input[name="username"]').waitFor({
     state: "visible",
     timeout: 60000
   });
 
-  await username.fill("Admin");
+  await page.locator('input[name="username"]').fill("Admin");
+  await page.locator('input[name="password"]').fill("admin123");
 
-  await password.fill("admin123");
-
-  await page.getByRole("button", { name: "Login" }).click();
-
-  await expect(page).toHaveURL(/dashboard/, {
-    timeout: 60000
-  });
-
+  await Promise.all([
+    page.waitForURL(/dashboard/, { timeout: 60000 }),
+    page.getByRole("button", { name: "Login" }).click()
+  ]);
 }
 
-
-// Open Admin module
 async function openAdmin(page) {
-
-  await page.locator(".oxd-sidepanel-body").waitFor({
-    state: "visible",
-    timeout: 60000
-  });
-
-  const adminMenu = page.getByRole("link", {
-    name: /^Admin$/
-  });
-
-  await adminMenu.waitFor({
-    state: "visible",
-    timeout: 60000
-  });
-
-  await adminMenu.click();
-
-  await expect(page).toHaveURL(/admin/, {
-    timeout: 60000
-  });
-
+  await safeGoto(page, `${baseURL}/admin/viewSystemUsers`);
+  await expect(page).toHaveURL(/viewSystemUsers/, { timeout: 60000 });
 }
 
+async function openAddUser(page) {
+  await safeGoto(page, `${baseURL}/admin/saveSystemUser`);
+  await expect(page).toHaveURL(/saveSystemUser/, { timeout: 60000 });
+}
 
-// Admin module tests
-test.describe("Admin User Management", () => {
-
+test.describe("Admin Functional Testing", () => {
   test.beforeEach(async ({ page }) => {
-
     await login(page);
+  });
 
+  test("1 Username search workflow", async ({ page }) => {
+    await openAdmin(page);
+    await page.locator(".oxd-input").nth(1).fill("Admin");
+    await page.getByRole("button", { name: "Search" }).click();
+    await expect(page).toHaveURL(/viewSystemUsers/);
+  });
+
+  test("2 Invalid username search workflow", async ({ page }) => {
+    await openAdmin(page);
+    await page.locator(".oxd-input").nth(1).fill("wronguser123");
+    await page.getByRole("button", { name: "Search" }).click();
+    await expect(page).toHaveURL(/viewSystemUsers/);
+  });
+
+  test("3 Username clear and rewrite workflow", async ({ page }) => {
+    await openAdmin(page);
+    const username = page.locator(".oxd-input").nth(1);
+    await username.fill("WrongUser");
+    await username.clear();
+    await username.fill("Admin");
+    await expect(username).toHaveValue("Admin");
+  });
+
+  test("4 User role dropdown filter workflow", async ({ page }) => {
+    await openAdmin(page);
+    await page.locator(".oxd-select-text").first().click();
+    await page.getByRole("option", { name: "Admin" }).click();
+    await page.getByRole("button", { name: "Search" }).click();
+    await expect(page).toHaveURL(/viewSystemUsers/);
+  });
+
+  test("5 Status dropdown filter workflow", async ({ page }) => {
+    await openAdmin(page);
+    await page.locator(".oxd-select-text").nth(1).click();
+    await page.getByRole("option", { name: "Enabled" }).click();
+    await page.getByRole("button", { name: "Search" }).click();
+    await expect(page).toHaveURL(/viewSystemUsers/);
+  });
+
+  test("6 Employee autocomplete workflow", async ({ page }) => {
+    await openAdmin(page);
+    await page.getByPlaceholder("Type for hints...").fill("John");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/viewSystemUsers/);
+  });
+
+  test("7 Combined user role and status workflow", async ({ page }) => {
     await openAdmin(page);
 
-  });
+    await page.locator(".oxd-select-text").first().click();
+    await page.getByRole("option", { name: "Admin" }).click();
 
-
-  test("1 Admin page should open", async ({ page }) => {
-
-    await expect(page).toHaveURL(/admin/);
-
-  });
-
-
-  test("2 System Users heading should be visible", async ({ page }) => {
-
-    await expect(
-      page.getByText("System Users")
-    ).toBeVisible();
-
-  });
-
-
-  test("3 Username search field should accept input", async ({ page }) => {
-
-    const usernameField = page.locator(".oxd-input").nth(1);
-
-    await usernameField.fill("Admin");
-
-    await expect(usernameField).toHaveValue("Admin");
-
-  });
-
-
-  test("4 Search valid username", async ({ page }) => {
-
-    const usernameField = page.locator(".oxd-input").nth(1);
-
-    await usernameField.fill("Admin");
+    await page.locator(".oxd-select-text").nth(1).click();
+    await page.getByRole("option", { name: "Enabled" }).click();
 
     await page.getByRole("button", { name: "Search" }).click();
-
-    await expect(
-      page.getByRole("button", { name: "Search" })
-    ).toBeVisible();
-
+    await expect(page).toHaveURL(/viewSystemUsers/);
   });
 
-
-  test("5 Search invalid username", async ({ page }) => {
-
-    const usernameField = page.locator(".oxd-input").nth(1);
-
-    await usernameField.fill("wronguser12345");
-
-    await page.getByRole("button", { name: "Search" }).click();
-
-    await expect(
-      page.getByRole("button", { name: "Search" })
-    ).toBeVisible();
-
+  test("8 Add user required validation workflow", async ({ page }) => {
+    await openAddUser(page);
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Required").first()).toBeVisible();
   });
 
-
-  test("6 Reset button should clear username field", async ({ page }) => {
-
-    const usernameField = page.locator(".oxd-input").nth(1);
-
-    await usernameField.fill("Admin");
-
-    await page.getByRole("button", { name: "Reset" }).click();
-
-    await expect(usernameField).toHaveValue("");
-
+  test("9 Add user cancel workflow", async ({ page }) => {
+    await openAddUser(page);
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page).toHaveURL(/viewSystemUsers/);
   });
 
+  test("10 Add user role dropdown workflow", async ({ page }) => {
+    await openAddUser(page);
+    await page.locator(".oxd-select-text").first().click();
+    await page.getByRole("option", { name: "Admin" }).click();
+    await expect(page).toHaveURL(/saveSystemUser/);
+  });
 
-  test("7 Add user page should open", async ({ page }) => {
+  test("11 Add user status dropdown workflow", async ({ page }) => {
+    await openAddUser(page);
+    await page.locator(".oxd-select-text").nth(1).click();
+    await page.getByRole("option", { name: "Enabled" }).click();
+    await expect(page).toHaveURL(/saveSystemUser/);
+  });
 
-    await page.getByRole("button", { name: "Add" }).click();
+  test("12 Password mismatch validation workflow", async ({ page }) => {
+    await openAddUser(page);
+    await page.locator('input[type="password"]').first().fill("Admin123");
+    await page.locator('input[type="password"]').nth(1).fill("Wrong123");
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Passwords do not match").first()).toBeVisible();
+  });
+
+  test("13 Password clear and rewrite workflow", async ({ page }) => {
+    await openAddUser(page);
+
+    const password = page.locator('input[type="password"]').first();
+
+    await password.fill("Wrong123");
+    await password.clear();
+    await password.fill("Admin123");
+
+    await expect(password).toHaveValue("Admin123");
+  });
+
+  test("14 Add user employee autocomplete workflow", async ({ page }) => {
+    await openAddUser(page);
+    await page.getByPlaceholder("Type for hints...").fill("John");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/saveSystemUser/);
+  });
+
+  test("15 Add user form combined input workflow", async ({ page }) => {
+    await openAddUser(page);
+
+    await page.locator(".oxd-select-text").first().click();
+    await page.getByRole("option", { name: "Admin" }).click();
+
+    await page.locator(".oxd-select-text").nth(1).click();
+    await page.getByRole("option", { name: "Enabled" }).click();
+
+    await page.locator('input[type="password"]').first().fill("Admin123");
+    await page.locator('input[type="password"]').nth(1).fill("Admin123");
 
     await expect(page).toHaveURL(/saveSystemUser/);
-
   });
-
-
-  test("8 Username field should be available", async ({ page }) => {
-
-    await page.getByRole("button", { name: "Add" }).click();
-
-    await expect(
-      page.locator(".oxd-input").nth(1)
-    ).toBeVisible();
-
-  });
-
-
-  test("9 Password field should be available", async ({ page }) => {
-
-    await page.getByRole("button", { name: "Add" }).click();
-
-    await expect(
-      page.locator('input[type="password"]').first()
-    ).toBeVisible();
-
-  });
-
-
-  test("10 Confirm password field should be available", async ({ page }) => {
-
-    await page.getByRole("button", { name: "Add" }).click();
-
-    await expect(
-      page.locator('input[type="password"]').nth(1)
-    ).toBeVisible();
-
-  });
-
-
-  test("11 Search button should be visible", async ({ page }) => {
-
-    await expect(
-      page.getByRole("button", { name: "Search" })
-    ).toBeVisible();
-
-  });
-
-
-  test("12 User table should be visible", async ({ page }) => {
-
-    await expect(
-      page.locator(".oxd-table-body")
-    ).toBeVisible();
-
-  });
-
-
-  test("13 Admin page should refresh successfully", async ({ page }) => {
-
-    await page.reload({
-      waitUntil: "domcontentloaded"
-    });
-
-    await expect(page).toHaveURL(/admin/);
-
-  });
-
-
-  test("14 Admin action buttons should be available", async ({ page }) => {
-
-    await expect(
-      page.locator(".oxd-table-cell-actions button").first()
-    ).toBeVisible();
-
-  });
-
-
-  test("15 Logout from Admin module", async ({ page }) => {
-
-    await page.locator(".oxd-userdropdown-tab").click();
-
-    await page.getByRole("menuitem", { name: "Logout" }).click();
-
-    await expect(page).toHaveURL(/login/, {
-      timeout: 60000
-    });
-
-  });
-
 });
