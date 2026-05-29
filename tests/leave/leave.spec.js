@@ -175,17 +175,19 @@ test.describe("Leave Functional Testing", () => {
   });
 
   test("9 Leave list date workflow", async ({ page }) => {
-    await openLeaveList(page);
+  await openLeaveList(page);
 
-    const dateInput = page.locator('input[placeholder="yyyy-dd-mm"]').first();
+  const dateInputs = page.locator('input[placeholder="yyyy-dd-mm"]');
 
-    if (await dateInput.count()) {
-      await dateInput.fill("2026-29-05");
-      await expect(dateInput).toHaveValue("2026-29-05");
-    } else {
-      await expect(page).toHaveURL(/viewLeaveList/);
-    }
-  });
+  if (await dateInputs.count()) {
+    await dateInputs.first().click();
+    await dateInputs.first().press("Control+A");
+    await dateInputs.first().fill("2026-29-05");
+    await expect(dateInputs.first()).toHaveValue("2026-29-05");
+  } else {
+    await expect(page).toHaveURL(/viewLeaveList/);
+  }
+});
 
   test("10 Leave list employee autocomplete workflow", async ({ page }) => {
     await openLeaveList(page);
