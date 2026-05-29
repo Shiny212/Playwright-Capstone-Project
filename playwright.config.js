@@ -13,7 +13,7 @@ module.exports = defineConfig({
 
   workers: 1,
 
-  retries: 1,
+  retries: 2,
 
   reporter: [
     ['html', { outputFolder: 'playwright-report' }],
@@ -25,9 +25,9 @@ module.exports = defineConfig({
 
     headless: true,
 
-    actionTimeout: 45000,
+    actionTimeout: 60000,
 
-    navigationTimeout: 90000,
+    navigationTimeout: 120000,
 
     trace: 'on-first-retry',
 

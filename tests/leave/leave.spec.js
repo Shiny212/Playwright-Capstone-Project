@@ -5,10 +5,18 @@ test.setTimeout(180000);
 const baseURL = "https://opensource-demo.orangehrmlive.com/web/index.php";
 
 async function login(page) {
-  await page.goto(`${baseURL}/auth/login`, {
-    waitUntil: "domcontentloaded",
-    timeout: 120000
-  });
+  for (let i = 0; i < 3; i++) {
+  try {
+    await page.goto(`${baseURL}/auth/login`, {
+      waitUntil: "domcontentloaded",
+      timeout: 120000
+    });
+    break;
+  } catch (e) {
+    if (i === 2) throw e;
+    await page.waitForTimeout(5000);
+  }
+}
 
   await page.locator('input[name="username"]').waitFor({
     state: "visible",
