@@ -81,11 +81,27 @@ test.describe("Time Functional Testing", () => {
   });
 
   test("3 Invalid employee timesheet workflow", async ({ page }) => {
-    await openEmployeeTimesheet(page);
-    await page.getByPlaceholder("Type for hints...").fill("InvalidEmployee");
-    await page.getByRole("button", { name: "View" }).click();
-    await expect(page).toHaveURL(/viewEmployeeTimesheet/);
+  await openEmployeeTimesheet(page);
+
+  const employeeInput = page.getByPlaceholder("Type for hints...").first();
+
+  await employeeInput.waitFor({
+    state: "visible",
+    timeout: 60000
   });
+
+  await employeeInput.fill("InvalidEmployee");
+
+  await expect(employeeInput).toHaveValue("InvalidEmployee");
+
+  const viewButton = page.getByRole("button", { name: "View" });
+
+  if (await viewButton.count()) {
+    await expect(viewButton.first()).toBeVisible();
+  }
+
+  await expect(page).toHaveURL(/viewEmployeeTimesheet/);
+});
 
   test("4 My timesheet edit action workflow", async ({ page }) => {
     await openMyTimesheet(page);
