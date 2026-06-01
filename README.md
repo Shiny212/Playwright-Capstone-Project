@@ -8,9 +8,9 @@ Modules:
 3 PIM
 4 Recruitment
 5 Performance
-6 Claim
-7 Maintenance
-8 Dashboard
+6 Time
+7 My Info
+8 Leave
 
 Total:
 120 tests
