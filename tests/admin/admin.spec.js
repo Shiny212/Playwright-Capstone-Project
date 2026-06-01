@@ -7,11 +7,14 @@ const baseURL = "https://opensource-demo.orangehrmlive.com/web/index.php";
 async function safeGoto(page, url) {
   for (let i = 0; i < 3; i++) {
     try {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 120000 });
+      await page.goto(url, {
+        waitUntil: "networkidle",
+        timeout: 120000
+      });
       return;
     } catch (error) {
       if (i === 2) throw error;
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(5000);
     }
   }
 }
@@ -19,18 +22,22 @@ async function safeGoto(page, url) {
 async function login(page) {
   await safeGoto(page, `${baseURL}/auth/login`);
 
-  await page.locator('input[name="username"]').waitFor({
+  const username = page.locator('input[name="username"]');
+  const password = page.locator('input[name="password"]');
+
+  await username.waitFor({
     state: "visible",
-    timeout: 60000
+    timeout: 120000
   });
 
-  await page.locator('input[name="username"]').fill("Admin");
-  await page.locator('input[name="password"]').fill("admin123");
+  await username.fill("Admin");
+  await password.fill("admin123");
 
-  await Promise.all([
-    page.waitForURL(/dashboard/, { timeout: 60000 }),
-    page.getByRole("button", { name: "Login" }).click()
-  ]);
+  await page.getByRole("button", { name: "Login" }).click();
+
+  await expect(page).toHaveURL(/dashboard/, {
+    timeout: 120000
+  });
 }
 
 async function openAdmin(page) {
@@ -41,6 +48,20 @@ async function openAdmin(page) {
 async function openAddUser(page) {
   await safeGoto(page, `${baseURL}/admin/saveSystemUser`);
   await expect(page).toHaveURL(/saveSystemUser/, { timeout: 60000 });
+}
+
+async function selectDropdownOption(page, dropdownIndex, optionName) {
+  await page.locator(".oxd-select-text").nth(dropdownIndex).click();
+  await page.getByRole("option", { name: optionName }).click();
+}
+
+async function selectAutocomplete(page, value) {
+  const input = page.getByPlaceholder("Type for hints...");
+  await input.waitFor({ state: "visible", timeout: 60000 });
+  await input.fill(value);
+  await page.waitForTimeout(3000);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
 }
 
 test.describe("Admin Functional Testing", () => {
@@ -73,36 +94,29 @@ test.describe("Admin Functional Testing", () => {
 
   test("4 User role dropdown filter workflow", async ({ page }) => {
     await openAdmin(page);
-    await page.locator(".oxd-select-text").first().click();
-    await page.getByRole("option", { name: "Admin" }).click();
+    await selectDropdownOption(page, 0, "Admin");
     await page.getByRole("button", { name: "Search" }).click();
     await expect(page).toHaveURL(/viewSystemUsers/);
   });
 
   test("5 Status dropdown filter workflow", async ({ page }) => {
     await openAdmin(page);
-    await page.locator(".oxd-select-text").nth(1).click();
-    await page.getByRole("option", { name: "Enabled" }).click();
+    await selectDropdownOption(page, 1, "Enabled");
     await page.getByRole("button", { name: "Search" }).click();
     await expect(page).toHaveURL(/viewSystemUsers/);
   });
 
   test("6 Employee autocomplete workflow", async ({ page }) => {
     await openAdmin(page);
-    await page.getByPlaceholder("Type for hints...").fill("John");
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
+    await selectAutocomplete(page, "John");
     await expect(page).toHaveURL(/viewSystemUsers/);
   });
 
   test("7 Combined user role and status workflow", async ({ page }) => {
     await openAdmin(page);
 
-    await page.locator(".oxd-select-text").first().click();
-    await page.getByRole("option", { name: "Admin" }).click();
-
-    await page.locator(".oxd-select-text").nth(1).click();
-    await page.getByRole("option", { name: "Enabled" }).click();
+    await selectDropdownOption(page, 0, "Admin");
+    await selectDropdownOption(page, 1, "Enabled");
 
     await page.getByRole("button", { name: "Search" }).click();
     await expect(page).toHaveURL(/viewSystemUsers/);
@@ -111,26 +125,24 @@ test.describe("Admin Functional Testing", () => {
   test("8 Add user required validation workflow", async ({ page }) => {
     await openAddUser(page);
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Required").first()).toBeVisible();
+    await expect(page.getByText("Required").first()).toBeVisible({ timeout: 60000 });
   });
 
   test("9 Add user cancel workflow", async ({ page }) => {
     await openAddUser(page);
     await page.getByRole("button", { name: "Cancel" }).click();
-    await expect(page).toHaveURL(/viewSystemUsers/);
+    await expect(page).toHaveURL(/viewSystemUsers/, { timeout: 60000 });
   });
 
   test("10 Add user role dropdown workflow", async ({ page }) => {
     await openAddUser(page);
-    await page.locator(".oxd-select-text").first().click();
-    await page.getByRole("option", { name: "Admin" }).click();
+    await selectDropdownOption(page, 0, "Admin");
     await expect(page).toHaveURL(/saveSystemUser/);
   });
 
   test("11 Add user status dropdown workflow", async ({ page }) => {
     await openAddUser(page);
-    await page.locator(".oxd-select-text").nth(1).click();
-    await page.getByRole("option", { name: "Enabled" }).click();
+    await selectDropdownOption(page, 1, "Enabled");
     await expect(page).toHaveURL(/saveSystemUser/);
   });
 
@@ -139,7 +151,7 @@ test.describe("Admin Functional Testing", () => {
     await page.locator('input[type="password"]').first().fill("Admin123");
     await page.locator('input[type="password"]').nth(1).fill("Wrong123");
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Passwords do not match").first()).toBeVisible();
+    await expect(page.getByText("Passwords do not match").first()).toBeVisible({ timeout: 60000 });
   });
 
   test("13 Password clear and rewrite workflow", async ({ page }) => {
@@ -156,20 +168,15 @@ test.describe("Admin Functional Testing", () => {
 
   test("14 Add user employee autocomplete workflow", async ({ page }) => {
     await openAddUser(page);
-    await page.getByPlaceholder("Type for hints...").fill("John");
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
+    await selectAutocomplete(page, "John");
     await expect(page).toHaveURL(/saveSystemUser/);
   });
 
   test("15 Add user form combined input workflow", async ({ page }) => {
     await openAddUser(page);
 
-    await page.locator(".oxd-select-text").first().click();
-    await page.getByRole("option", { name: "Admin" }).click();
-
-    await page.locator(".oxd-select-text").nth(1).click();
-    await page.getByRole("option", { name: "Enabled" }).click();
+    await selectDropdownOption(page, 0, "Admin");
+    await selectDropdownOption(page, 1, "Enabled");
 
     await page.locator('input[type="password"]').first().fill("Admin123");
     await page.locator('input[type="password"]').nth(1).fill("Admin123");

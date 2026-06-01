@@ -1,50 +1,35 @@
 const { test, expect } = require("@playwright/test");
 
-test.setTimeout(180000);
+test.setTimeout(240000);
 
 const baseURL = "https://opensource-demo.orangehrmlive.com/web/index.php";
 
 async function safeGoto(page, url) {
-  for (let i = 0; i < 3; i++) {
-    try {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 120000 });
-      return;
-    } catch (e) {
-      if (i === 2) throw e;
-      await page.waitForTimeout(3000);
-    }
-  }
+  await page.goto(url, {
+    waitUntil: "networkidle",
+    timeout: 120000
+  });
 }
 
 async function login(page) {
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      await safeGoto(page, `${baseURL}/auth/login`);
+  await safeGoto(page, `${baseURL}/auth/login`);
 
-      await page.locator('input[name="username"]').waitFor({
-        state: "visible",
-        timeout: 60000
-      });
+  const username = page.locator('input[name="username"]');
+  const password = page.locator('input[name="password"]');
 
-      await page.locator('input[name="username"]').fill("Admin");
-      await page.locator('input[name="password"]').fill("admin123");
+  await username.waitFor({
+    state: "visible",
+    timeout: 120000
+  });
 
-      await page.getByRole("button", { name: "Login" }).click({
-        noWaitAfter: true,
-        timeout: 60000
-      });
+  await username.fill("Admin");
+  await password.fill("admin123");
 
-      await page.waitForTimeout(5000);
+  await page.getByRole("button", { name: "Login" }).click();
 
-      if (!page.url().includes("/auth/login")) {
-        await expect(page).toHaveURL(/dashboard/, { timeout: 120000 });
-        return;
-      }
-    } catch (error) {
-      if (attempt === 3) throw error;
-      await page.waitForTimeout(5000);
-    }
-  }
+  await expect(page).toHaveURL(/dashboard/, {
+    timeout: 120000
+  });
 }
 
 async function openCandidates(page) {
@@ -62,6 +47,19 @@ async function openAddVacancy(page) {
   await expect(page).toHaveURL(/addJobVacancy/, { timeout: 60000 });
 }
 
+async function selectDropdownOption(page, dropdownIndex = 0, optionIndex = 1) {
+  const dropdown = page.locator(".oxd-select-text").nth(dropdownIndex);
+
+  if ((await dropdown.count()) > 0) {
+    await dropdown.waitFor({ state: "visible", timeout: 60000 });
+    await dropdown.click();
+
+    const option = page.locator(".oxd-select-dropdown .oxd-select-option").nth(optionIndex);
+    await option.waitFor({ state: "visible", timeout: 60000 });
+    await option.click();
+  }
+}
+
 test.describe("Recruitment Functional Testing", () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
@@ -70,7 +68,7 @@ test.describe("Recruitment Functional Testing", () => {
   test("1 Candidate required validation workflow", async ({ page }) => {
     await openAddCandidate(page);
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Required").first()).toBeVisible();
+    await expect(page.getByText("Required").first()).toBeVisible({ timeout: 60000 });
   });
 
   test("2 Candidate name and email input workflow", async ({ page }) => {
@@ -79,16 +77,12 @@ test.describe("Recruitment Functional Testing", () => {
     await page.locator('input[name="lastName"]').fill("Candidate");
     await page.locator(".oxd-input").nth(5).fill("auto@test.com");
     await page.getByRole("button", { name: "Cancel" }).click();
-    await expect(page).toHaveURL(/viewCandidates/);
+    await expect(page).toHaveURL(/viewCandidates/, { timeout: 60000 });
   });
 
   test("3 Candidate vacancy dropdown workflow", async ({ page }) => {
     await openAddCandidate(page);
-    const dropdown = page.locator(".oxd-select-text").first();
-    if (await dropdown.count()) {
-      await dropdown.click();
-      await page.getByRole("option").nth(1).click();
-    }
+    await selectDropdownOption(page, 0, 1);
     await expect(page).toHaveURL(/addCandidate/);
   });
 
@@ -108,10 +102,13 @@ test.describe("Recruitment Functional Testing", () => {
 
   test("6 Candidate consent checkbox workflow", async ({ page }) => {
     await openAddCandidate(page);
+
     const checkbox = page.locator(".oxd-checkbox-input").first();
-    if (await checkbox.count()) {
+
+    if ((await checkbox.count()) > 0) {
       await checkbox.click();
     }
+
     await expect(page).toHaveURL(/addCandidate/);
   });
 
@@ -125,68 +122,73 @@ test.describe("Recruitment Functional Testing", () => {
 
   test("8 Candidate clear and rewrite workflow", async ({ page }) => {
     await openAddCandidate(page);
+
     const firstName = page.locator('input[name="firstName"]');
+
     await firstName.fill("Wrong");
     await firstName.clear();
     await firstName.fill("Correct");
+
     await expect(firstName).toHaveValue("Correct");
   });
 
   test("9 Candidate job title filter workflow", async ({ page }) => {
     await openCandidates(page);
-    const dropdown = page.locator(".oxd-select-text").first();
-    if (await dropdown.count()) {
-      await dropdown.click();
-      await page.getByRole("option").nth(1).click();
-    }
+    await selectDropdownOption(page, 0, 1);
     await expect(page).toHaveURL(/viewCandidates/);
   });
 
   test("10 Candidate vacancy filter workflow", async ({ page }) => {
     await openCandidates(page);
-    const dropdown = page.locator(".oxd-select-text").nth(1);
-    if (await dropdown.count()) {
-      await dropdown.click();
-      await page.getByRole("option").nth(1).click();
-    }
+    await selectDropdownOption(page, 1, 1);
     await expect(page).toHaveURL(/viewCandidates/);
   });
 
   test("11 Candidate hiring manager filter workflow", async ({ page }) => {
     await openCandidates(page);
-    const dropdown = page.locator(".oxd-select-text").nth(2);
-    if (await dropdown.count()) {
-      await dropdown.click();
-      await page.getByRole("option").nth(1).click();
-    }
+    await selectDropdownOption(page, 2, 1);
     await expect(page).toHaveURL(/viewCandidates/);
   });
 
   test("12 Vacancy required validation workflow", async ({ page }) => {
     await openAddVacancy(page);
     await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByText("Required").first()).toBeVisible();
+    await expect(page.getByText("Required").first()).toBeVisible({ timeout: 60000 });
   });
 
   test("13 Vacancy name input workflow", async ({ page }) => {
     await openAddVacancy(page);
-    await page.locator(".oxd-input").nth(1).fill("Automation Vacancy");
-    await expect(page.locator(".oxd-input").nth(1)).toHaveValue("Automation Vacancy");
+
+    const vacancyName = page.locator(".oxd-input").nth(1);
+
+    await vacancyName.waitFor({
+      state: "visible",
+      timeout: 60000
+    });
+
+    await vacancyName.fill("Automation Vacancy");
+
+    await expect(vacancyName).toHaveValue("Automation Vacancy");
   });
 
   test("14 Vacancy job title dropdown workflow", async ({ page }) => {
     await openAddVacancy(page);
-    const dropdown = page.locator(".oxd-select-text").first();
-    if (await dropdown.count()) {
-      await dropdown.click();
-      await page.getByRole("option").nth(1).click();
-    }
+    await selectDropdownOption(page, 0, 1);
     await expect(page).toHaveURL(/addJobVacancy/);
   });
 
   test("15 Vacancy description workflow", async ({ page }) => {
     await openAddVacancy(page);
-    await page.locator("textarea").fill("Automation vacancy description");
-    await expect(page.locator("textarea")).toHaveValue("Automation vacancy description");
+
+    const description = page.locator("textarea");
+
+    await description.waitFor({
+      state: "visible",
+      timeout: 60000
+    });
+
+    await description.fill("Automation vacancy description");
+
+    await expect(description).toHaveValue("Automation vacancy description");
   });
 });
